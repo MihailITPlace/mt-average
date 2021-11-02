@@ -2,7 +2,7 @@ import jade.core.AID
 import jade.core.behaviours.SimpleBehaviour
 import jade.lang.acl.ACLMessage
 
-class DefaultBehaviour constructor(private val agent: AverageAgent, number: Int, private val peers: List<AID>): SimpleBehaviour() {
+class DefaultBehaviour (private val agent: AverageAgent, number: Int, private val peers: List<AID>): SimpleBehaviour() {
     private var state = State.ACTIVE
     private val table = hashMapOf<String, Int>(agent.name to number)
 
@@ -34,6 +34,7 @@ class DefaultBehaviour constructor(private val agent: AverageAgent, number: Int,
         log("get tables from peers")
         val result = mutableListOf<Map<String, Int>>()
         val neededPeers = peers.map { it.name }.toMutableSet()
+
         while (neededPeers.isNotEmpty()) {
             log("request table from ${neededPeers.size} peers")
 
@@ -76,6 +77,7 @@ class DefaultBehaviour constructor(private val agent: AverageAgent, number: Int,
     private fun printResultIfCan() {
         log("print result if can")
         log("debug: ${table.toMessage()}")
+
         if (agent.name == table.keys.minOf { it }) {
             val average = table.values.sum().toDouble() / table.size
             log("AVERAGE: $average")

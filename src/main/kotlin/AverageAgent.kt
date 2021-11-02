@@ -12,8 +12,7 @@ class AverageAgent: Agent() {
                 .map { AID(it.toString(), false) }
 
             addBehaviour(DefaultBehaviour(this, number, peers))
-        }
-        else {
+        } else {
             println("${name}: arguments is null or empty :(")
         }
     }
