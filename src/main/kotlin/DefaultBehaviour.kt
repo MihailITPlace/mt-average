@@ -1,24 +1,26 @@
 import jade.core.AID
 import jade.core.behaviours.SimpleBehaviour
 import jade.lang.acl.ACLMessage
+import kotlin.random.Random
 
-class DefaultBehaviour (private val agent: AverageAgent, number: Int, private val peers: List<AID>): SimpleBehaviour() {
+class DefaultBehaviour (private val agent: AverageAgent, private var number: Double, private val peers: List<AID>): SimpleBehaviour() {
     private var state = State.ACTIVE
-    private val table = hashMapOf<String, Int>(agent.name to number)
+    private var prevNumber = number
+    private val alpha = 1/3
 
     override fun action() {
         when (state) {
             State.ACTIVE -> {
-                sendTableToPeers()
+                sendAverageToPeers()
 
-                val ts = getTablesFromPeers()
-                if (!updateTable(ts)) {
+                val ts = getAveragesFromPeers()
+                if (!updateAverage(ts)) {
                     state = State.PRINT
                 }
             }
             State.PRINT -> {
                 printResultIfCan()
-                sendTableToPeers()
+                sendAverageToPeers()
                 state = State.DONE
             }
             else -> {}
@@ -30,9 +32,9 @@ class DefaultBehaviour (private val agent: AverageAgent, number: Int, private va
         return state == State.DONE
     }
 
-    private fun getTablesFromPeers(): List<Map<String, Int>> {
+    private fun getAveragesFromPeers(): List<Double> {
         log("get tables from peers")
-        val result = mutableListOf<Map<String, Int>>()
+        val numbers = mutableListOf<Double>()
         val neededPeers = peers.map { it.name }.toMutableSet()
 
         while (neededPeers.isNotEmpty()) {
@@ -41,46 +43,40 @@ class DefaultBehaviour (private val agent: AverageAgent, number: Int, private va
             val msg = agent.blockingReceive()
             if (msg != null) {
                 neededPeers.remove(msg.sender.name)
-                result.add(msg.content.toTable())
+                numbers.add(msg.content.toDouble())
             } else {
                 println("AGENT ${agent.name} received NULL")
             }
         }
 
-        return result
+        return numbers
     }
 
-    private fun sendTableToPeers() {
+    private fun sendAverageToPeers() {
+        if (Random.nextDouble() < 0.05) { return }
         log("send table to peers")
         val msg = ACLMessage(ACLMessage.INFORM)
-        msg.content = table.toMessage()
+        msg.content = if (Random.nextDouble() > 0.03) number.toString() else prevNumber.toString()
         peers.forEach(msg::addReceiver)
 
         agent.send(msg)
     }
 
-    private fun updateTable(ts: List<Map<String, Int>>): Boolean {
-        log("update table")
-        if (ts.isNotEmpty() && ts.all { it.keys == table.keys }) {
-            return false
-        }
+    private fun updateAverage(numbers: List<Double>): Boolean {
+        log("update number")
 
-        for (t in ts) {
-            for (i in t) {
-                table.putIfAbsent(i.key, i.value)
-            }
-        }
+        prevNumber = number
+        number = alpha * (number + numbers.sum())
 
         return true
     }
 
     private fun printResultIfCan() {
         log("print result if can")
-        log("debug: ${table.toMessage()}")
+        log("debug: $number")
 
-        if (agent.name == table.keys.minOf { it }) {
-            val average = table.values.sum().toDouble() / table.size
-            log("AVERAGE: $average")
+        if (agent.name == AID("1st", false).name) {
+            log("AVERAGE: $number")
         }
     }
 
@@ -88,17 +84,6 @@ class DefaultBehaviour (private val agent: AverageAgent, number: Int, private va
         ACTIVE,
         PRINT,
         DONE
-    }
-
-    private fun String.toTable(): Map<String, Int> {
-        return split(";").associate {
-            val t = it.split(",")
-            t[0] to t[1].toInt()
-        }
-    }
-
-    private fun Map<String, Int>.toMessage(): String {
-        return this.entries.joinToString(";") { "${it.key},${it.value}" }
     }
 
     private fun log(msg: String) = println("${agent.name}: $msg")
